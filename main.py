@@ -4,9 +4,12 @@ from fastapi.responses import JSONResponse
 from database.db import engine, Base
 from transport import routes
 
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI()
+
+@app.on_event("startup")
+async def startup_event():
+    """Create database tables on startup"""
+    Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,
