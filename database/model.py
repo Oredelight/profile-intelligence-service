@@ -1,5 +1,5 @@
 from database.db import Base
-from sqlalchemy import Column, Integer, String, Float
+from sqlalchemy import Column, DateTime, Index, Integer, String, Float
 
 class Profile(Base):
     __tablename__ = "profiles"
@@ -8,9 +8,13 @@ class Profile(Base):
     name = Column(String, unique=True, nullable=False)
     gender = Column(String)
     gender_probability = Column(Float)
-    sample_size = Column(Integer)
     age = Column(Integer)
     age_group = Column(String)
-    country_id = Column(String)
+    country_id = Column(String(2))
+    country_name = Column(String)
     country_probability = Column(Float)
-    created_at = Column(String)
+    created_at = Column(DateTime, nullable=False)
+
+Index("idx_gender", Profile.gender)
+Index("idx_country", Profile.country_id)
+Index("idx_age", Profile.age)

@@ -2,14 +2,12 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from database.db import engine, Base
+from database.model import Profile
 from transport import routes
 
 app = FastAPI()
 
-@app.on_event("startup")
-async def startup_event():
-    """Create database tables on startup"""
-    Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,
