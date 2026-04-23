@@ -11,10 +11,10 @@ def parse_query(q: str):
     filters = {}
 
     # Gender
-    if "male" in q:
-        filters["gender"] = "male"
-    elif "female" in q:
+    if "female" in q:
         filters["gender"] = "female"
+    elif "male" in q:
+        filters["gender"] = "male"
 
     # Age group
     if "child" in q:
