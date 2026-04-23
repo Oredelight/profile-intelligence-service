@@ -9,7 +9,7 @@ def serialize_profile(p):
         "country_id": p.country_id,
         "country_name": p.country_name,
         "country_probability": p.country_probability,
-        "created_at": p.created_at.isoformat().replace("+00:00", "Z")
+        "created_at": p.created_at.isoformat()
     }
 
 def serialize_profile_list(p):
