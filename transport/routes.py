@@ -87,26 +87,30 @@ async def create_profile(payload: ProfileCreate, db: Session = Depends(get_db)):
 
 @router.get("/search")
 def search_profiles(
-    q: str,
+    q: str = None,
     page: int = 1,
     limit: int = 10,
     db: Session = Depends(get_db)
 ):
-    
-    if page < 1 or limit < 1:
-        raise HTTPException(status_code=400, detail="Invalid query parameters")
-
-    if limit > 50:
-        limit = 50
-
+    # Validate query parameter
     if not q or not q.strip():
         raise HTTPException(status_code=400, detail="Invalid query parameters")
 
+    # Validate pagination
+    if page < 1:
+        raise HTTPException(status_code=400, detail="Invalid query parameters")
+    if limit < 1:
+        raise HTTPException(status_code=400, detail="Invalid query parameters")
+    if limit > 50:
+        limit = 50
+
+    # Parse query
     filters = parse_query(q)
 
     if not filters:
         raise HTTPException(status_code=400, detail="Unable to interpret query")
 
+    # Build query
     query = db.query(Profile)
 
     if "gender" in filters:
@@ -124,9 +128,12 @@ def search_profiles(
     if "max_age" in filters:
         query = query.filter(Profile.age <= filters["max_age"])
 
+    # Get total count
     total = query.count()
 
-    results = query.offset((page - 1) * limit).limit(limit).all()
+    # Apply pagination
+    offset = (page - 1) * limit
+    results = query.offset(offset).limit(limit).all()
 
     return {
         "status": "success",
@@ -164,19 +171,50 @@ def list_profiles(
     limit: int = 10,
     db: Session = Depends(get_db)
 ):
-    if page < 1 or limit < 1:
+    # Validate pagination
+    if page < 1:
         raise HTTPException(status_code=400, detail="Invalid query parameters")
-
+    if limit < 1:
+        raise HTTPException(status_code=400, detail="Invalid query parameters")
     if limit > 50:
         limit = 50
 
+    # Validate age bounds
+    if min_age is not None and min_age < 0:
+        raise HTTPException(status_code=422, detail="Invalid query parameters")
+    if max_age is not None and max_age < 0:
+        raise HTTPException(status_code=422, detail="Invalid query parameters")
+    if min_age is not None and max_age is not None and min_age > max_age:
+        raise HTTPException(status_code=422, detail="Invalid query parameters")
+
+    # Validate probability bounds (0.0 to 1.0)
+    if min_gender_probability is not None:
+        if min_gender_probability < 0.0 or min_gender_probability > 1.0:
+            raise HTTPException(status_code=422, detail="Invalid query parameters")
+    if min_country_probability is not None:
+        if min_country_probability < 0.0 or min_country_probability > 1.0:
+            raise HTTPException(status_code=422, detail="Invalid query parameters")
+
+    # Validate sort parameters
+    sort_fields = {
+        "age": Profile.age,
+        "created_at": Profile.created_at,
+        "gender_probability": Profile.gender_probability
+    }
+
+    if sort_by not in sort_fields:
+        raise HTTPException(status_code=422, detail="Invalid query parameters")
+    if order not in ["asc", "desc"]:
+        raise HTTPException(status_code=422, detail="Invalid query parameters")
+
+    # Build query with filters
     query = db.query(Profile)
 
     if gender:
-        query = query.filter(Profile.gender.ilike(gender.strip()))
+        query = query.filter(Profile.gender == gender.strip().lower())
 
     if age_group:
-        query = query.filter(Profile.age_group.ilike(age_group.strip()))
+        query = query.filter(Profile.age_group == age_group.strip().lower())
 
     if country_id:
         query = query.filter(Profile.country_id == country_id.strip().upper())
@@ -193,32 +231,19 @@ def list_profiles(
     if min_country_probability is not None:
         query = query.filter(Profile.country_probability >= min_country_probability)
 
-    base_query = query
+    # Get total count
+    total = query.count()
 
-
-    total = base_query.with_entities(func.count()).order_by(None).scalar()
-
-
-    sort_fields = {
-        "age": Profile.age,
-        "created_at": Profile.created_at,
-        "gender_probability": Profile.gender_probability
-    }
-
-    if sort_by not in sort_fields or order not in ["asc", "desc"]:
-        return {"status": "error", "message": "Invalid query parameters"}
-
+    # Apply sorting
     sort_column = sort_fields[sort_by]
-
     if order == "desc":
-        base_query = base_query.order_by(sort_column.desc())
+        query = query.order_by(sort_column.desc())
     else:
-        base_query = base_query.order_by(sort_column.asc())
+        query = query.order_by(sort_column.asc())
 
-
+    # Apply pagination
     offset = (page - 1) * limit
-
-    data = base_query.offset(offset).limit(limit).all()
+    data = query.offset(offset).limit(limit).all()
 
     return {
         "status": "success",
