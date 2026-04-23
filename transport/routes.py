@@ -190,12 +190,15 @@ def list_profiles(
         raise HTTPException(400, "Invalid query parameters")
 
     sort_column = sort_fields[sort_by]
-    query = query.order_by(sort_column.desc() if order == "desc" else sort_column.asc())
 
-    # ✅ total AFTER filters
-    total = query.count()
+    query = query.order_by(
+        sort_column.desc() if order == "desc" else sort_column.asc()
+    )
 
-    # ✅ pagination LAST
+    # total
+    total = query.order_by(None).count()
+
+    # pagination
     data = query.offset((page - 1) * limit).limit(limit).all()
     return {
         "status": "success",
