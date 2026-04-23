@@ -9,8 +9,10 @@ from uuid6 import uuid7
 from utils.countries import get_country_name
 from utils.query_parser import parse_query
 from datetime import datetime, timezone
+import re
 
 router = APIRouter(prefix="/api/profiles", tags=["Profiles"])
+
 
 # POST
 @router.post("")
@@ -19,8 +21,9 @@ async def create_profile(payload: ProfileCreate, db: Session = Depends(get_db)):
 
     if not name:
         raise HTTPException(status_code=400, detail="Name is required")
-    if not name.isalpha():
-        raise HTTPException(status_code=422, detail="Name must be a string")
+
+    if not re.match(r"^[a-zA-Z][a-zA-Z\s\-']*$", name):
+        raise HTTPException(status_code=422, detail="Name must contain only letters, hyphens, spaces, or apostrophes")
 
     existing = db.query(Profile).filter(Profile.name == name).first()
     if existing:
@@ -45,21 +48,29 @@ async def create_profile(payload: ProfileCreate, db: Session = Depends(get_db)):
 
     # Validate Nationalize
     if not country_data.get("country"):
-        raise HTTPException(status_code=502,detail="Nationalize returned an invalid response")
+        raise HTTPException(status_code=502, detail="Nationalize returned an invalid response")
 
     top_country = max(country_data["country"], key=lambda x: x["probability"])
     country_id = top_country["country_id"]
+
+    gender_probability = gender_data.get("probability")
+    if gender_probability is None:
+        gender_probability = 0.0
+
+    country_probability = top_country.get("probability")
+    if country_probability is None:
+        country_probability = 0.0
 
     profile = Profile(
         id=str(uuid7()),
         name=name,
         gender=gender_data["gender"].strip().lower(),
-        gender_probability=gender_data.get("probability") or 0.0,
+        gender_probability=gender_probability,
         age=age_data["age"],
         age_group=get_age_group(age_data["age"]),
         country_id=top_country["country_id"],
         country_name=get_country_name(country_id),
-        country_probability=top_country.get("probability") or 0.0,
+        country_probability=country_probability,
         created_at=datetime.now(timezone.utc)
     )
 
@@ -72,6 +83,7 @@ async def create_profile(payload: ProfileCreate, db: Session = Depends(get_db)):
         "data": serialize_profile(profile)
     }
 
+
 @router.get("/search")
 def search_profiles(
     q: str,
@@ -79,13 +91,20 @@ def search_profiles(
     limit: int = 10,
     db: Session = Depends(get_db)
 ):
+    
+    if page < 1 or limit < 1:
+        raise HTTPException(status_code=400, detail="Invalid query parameters")
+
+    if limit > 50:
+        limit = 50
+
     if not q or not q.strip():
-        return {"status": "error", "message": "Invalid query parameters"}
+        raise HTTPException(status_code=400, detail="Invalid query parameters")
 
     filters = parse_query(q)
 
     if not filters:
-        return {"status": "error", "message": "Unable to interpret query"}
+        raise HTTPException(status_code=400, detail="Unable to interpret query")
 
     query = db.query(Profile)
 
@@ -116,7 +135,7 @@ def search_profiles(
         "data": [serialize_profile_list(p) for p in results]
     }
 
-# GET by ID
+
 @router.get("/{id}")
 def get_profile(id: str, db: Session = Depends(get_db)):
     profile = db.query(Profile).filter(Profile.id == id).first()
@@ -129,7 +148,6 @@ def get_profile(id: str, db: Session = Depends(get_db)):
         "data": serialize_profile(profile)
     }
 
-# GET list with filters
 @router.get("")
 def list_profiles(
     gender: str = None,
@@ -146,15 +164,13 @@ def list_profiles(
     db: Session = Depends(get_db)
 ):
     if page < 1 or limit < 1:
-        raise HTTPException(400, "Invalid query parameters")
+        raise HTTPException(status_code=400, detail="Invalid query parameters")
 
     if limit > 50:
         limit = 50
 
-    # BASE QUERY (VERY IMPORTANT)
     query = db.query(Profile)
 
-    # FILTERS
     if gender:
         query = query.filter(Profile.gender.ilike(gender.strip()))
 
@@ -176,7 +192,6 @@ def list_profiles(
     if min_country_probability is not None:
         query = query.filter(Profile.country_probability >= min_country_probability)
 
-    # VALID SORT FIELDS
     sort_fields = {
         "age": Profile.age,
         "created_at": Profile.created_at,
@@ -184,18 +199,15 @@ def list_profiles(
     }
 
     if sort_by not in sort_fields or order not in ["asc", "desc"]:
-        return {"status": "error", "message": "Invalid query parameters"}
+        raise HTTPException(status_code=400, detail="Invalid query parameters")
 
-    # TOTAL BEFORE ORDERING (CRITICAL FIX)
     total = query.count()
 
-    # SORTING
     sort_column = sort_fields[sort_by]
     query = query.order_by(
         sort_column.desc() if order == "desc" else sort_column.asc()
     )
 
-    # PAGINATION
     data = query.offset((page - 1) * limit).limit(limit).all()
 
     return {
@@ -206,15 +218,12 @@ def list_profiles(
         "data": [serialize_profile_list(p) for p in data]
     }
 
-
-# DELETE
 @router.delete("/{id}")
 def delete_profile(id: str, db: Session = Depends(get_db)):
-
     profile = db.query(Profile).filter(Profile.id == id).first()
 
     if not profile:
-        return {"status": "error", "message": "Profile not found"}
+        raise HTTPException(status_code=404, detail="Profile not found")
 
     db.delete(profile)
     db.commit()
