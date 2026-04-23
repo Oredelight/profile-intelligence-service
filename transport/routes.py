@@ -60,7 +60,7 @@ async def create_profile(payload: ProfileCreate, db: Session = Depends(get_db)):
         country_id=top_country["country_id"],
         country_name=get_country_name(country_id),
         country_probability=top_country["probability"],
-        created_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        created_at=datetime.now(timezone.utc)
     )
 
     db.add(profile)
@@ -86,7 +86,7 @@ def search_profiles(
     filters = parse_query(q)
 
     if not filters:
-        return {"status": "error", "message": "Unable to interpret query"}
+        raise HTTPException(status_code=400, detail="Unable to interpret query")
 
     query = db.query(Profile)
 
@@ -148,9 +148,10 @@ def list_profiles(
     db: Session = Depends(get_db)
 ):
     if page < 1 or limit < 1:
-        return {"status": "error", "message": "Invalid query parameters"}
+        raise HTTPException(400, "Invalid query parameters")
 
-    limit = min(limit, 50)
+    if limit > 50:
+        limit = 50
 
     query = db.query(Profile)
 
@@ -176,23 +177,26 @@ def list_profiles(
     if min_country_probability is not None:
         query = query.filter(Profile.country_probability >= min_country_probability)
 
-    # COUNT (AFTER FILTERS)
-    total = query.count()
-
-    # SORT
-    sort_map = {
-        "age": Profile.age,
-        "created_at": Profile.created_at,
-        "gender_probability": Profile.gender_probability
+    sort_fields = {
+    "age": Profile.age,
+    "created_at": Profile.created_at,
+    "gender_probability": Profile.gender_probability
     }
 
-    column = sort_map.get(sort_by, Profile.created_at)
+    if sort_by not in sort_fields:
+        raise HTTPException(400, "Invalid query parameters")
 
-    query = query.order_by(column.desc() if order == "desc" else column.asc())
+    if order not in ["asc", "desc"]:
+        raise HTTPException(400, "Invalid query parameters")
 
-    # PAGINATION
+    sort_column = sort_fields[sort_by]
+    query = query.order_by(sort_column.desc() if order == "desc" else sort_column.asc())
+
+    # ✅ total AFTER filters
+    total = query.count()
+
+    # ✅ pagination LAST
     data = query.offset((page - 1) * limit).limit(limit).all()
-
     return {
         "status": "success",
         "page": page,
