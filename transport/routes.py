@@ -54,12 +54,12 @@ async def create_profile(payload: ProfileCreate, db: Session = Depends(get_db)):
         id=str(uuid7()),
         name=name,
         gender=gender_data["gender"].strip().lower(),
-        gender_probability=gender_data["probability"],
+        gender_probability=gender_data.get("probability") or 0.0,
         age=age_data["age"],
         age_group=get_age_group(age_data["age"]),
         country_id=top_country["country_id"],
         country_name=get_country_name(country_id),
-        country_probability=top_country["probability"],
+        country_probability=top_country.get("probability") or 0.0,
         created_at=datetime.now(timezone.utc)
     )
 
@@ -79,14 +79,13 @@ def search_profiles(
     limit: int = 10,
     db: Session = Depends(get_db)
 ):
-
     if not q or not q.strip():
         return {"status": "error", "message": "Invalid query parameters"}
 
     filters = parse_query(q)
 
     if not filters:
-        raise HTTPException(status_code=400, detail="Unable to interpret query")
+        return {"status": "error", "message": "Unable to interpret query"}
 
     query = db.query(Profile)
 
@@ -116,7 +115,6 @@ def search_profiles(
         "total": total,
         "data": [serialize_profile_list(p) for p in results]
     }
-
 
 # GET by ID
 @router.get("/{id}")
@@ -153,17 +151,18 @@ def list_profiles(
     if limit > 50:
         limit = 50
 
+    # BASE QUERY (VERY IMPORTANT)
     query = db.query(Profile)
 
     # FILTERS
     if gender:
-        query = query.filter(Profile.gender == gender.lower().strip())
+        query = query.filter(Profile.gender.ilike(gender.strip()))
 
     if age_group:
-        query = query.filter(Profile.age_group == age_group.lower().strip())
+        query = query.filter(Profile.age_group.ilike(age_group.strip()))
 
     if country_id:
-        query = query.filter(Profile.country_id == country_id.upper().strip())
+        query = query.filter(Profile.country_id == country_id.strip().upper())
 
     if min_age is not None:
         query = query.filter(Profile.age >= min_age)
@@ -177,29 +176,28 @@ def list_profiles(
     if min_country_probability is not None:
         query = query.filter(Profile.country_probability >= min_country_probability)
 
+    # VALID SORT FIELDS
     sort_fields = {
-    "age": Profile.age,
-    "created_at": Profile.created_at,
-    "gender_probability": Profile.gender_probability
+        "age": Profile.age,
+        "created_at": Profile.created_at,
+        "gender_probability": Profile.gender_probability
     }
 
-    if sort_by not in sort_fields:
-        raise HTTPException(400, "Invalid query parameters")
+    if sort_by not in sort_fields or order not in ["asc", "desc"]:
+        return {"status": "error", "message": "Invalid query parameters"}
 
-    if order not in ["asc", "desc"]:
-        raise HTTPException(400, "Invalid query parameters")
+    # TOTAL BEFORE ORDERING (CRITICAL FIX)
+    total = query.count()
 
+    # SORTING
     sort_column = sort_fields[sort_by]
-
     query = query.order_by(
         sort_column.desc() if order == "desc" else sort_column.asc()
     )
 
-    # total
-    total = query.order_by(None).count()
-
-    # pagination
+    # PAGINATION
     data = query.offset((page - 1) * limit).limit(limit).all()
+
     return {
         "status": "success",
         "page": page,
