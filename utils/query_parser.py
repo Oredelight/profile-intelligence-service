@@ -1,20 +1,17 @@
 import re
 
-COUNTRY_KEYWORDS = {
-    "nigeria": "NG",
-    "kenya": "KE",
-    "angola": "AO"
-}
-
 def parse_query(q: str):
-    q = q.lower()
+    q = q.lower().strip()
     filters = {}
 
-    # Gender
-    if "male" in q and "female" not in q:
-        pass
+    has_male = "male" in q
+    has_female = "female" in q
 
-    # Age group
+    if has_male and not has_female:
+        filters["gender"] = "male"
+    elif has_female and not has_male:
+        filters["gender"] = "female"
+
     if "child" in q:
         filters["age_group"] = "child"
     elif "teen" in q:
@@ -24,18 +21,14 @@ def parse_query(q: str):
     elif "senior" in q:
         filters["age_group"] = "senior"
 
-    # Young (special rule)
     if "young" in q:
         filters["min_age"] = 16
         filters["max_age"] = 24
 
-    # Above age
-    import re
     match = re.search(r"above (\d+)", q)
     if match:
         filters["min_age"] = int(match.group(1))
 
-    # Country
     countries = {
         "nigeria": "NG",
         "kenya": "KE",
