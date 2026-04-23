@@ -1,49 +1,65 @@
 import re
 
+COUNTRY_MAP = {
+    "nigeria": "NG",
+    "kenya": "KE",
+    "angola": "AO",
+    "benin": "BJ",
+    "ghana": "GH",
+    "south africa": "ZA",
+    "egypt": "EG",
+    "morocco": "MA",
+}
+
+
 def parse_query(q: str):
+    if not q:
+        return None
+
     q = q.lower().strip()
-    words = q.split()
 
     filters = {}
 
-    # HANDLE gender (ignore if both present)
-    if "male" in words and "female" not in words:
-        filters["gender"] = "male"
-    elif "female" in words and "male" not in words:
-        filters["gender"] = "female"
+    has_male = "male" in q
+    has_female = "female" in q
 
-    # AGE GROUPS
-    if "child" in words:
+    if has_male and not has_female:
+        filters["gender"] = "male"
+    elif has_female and not has_male:
+        filters["gender"] = "female"
+   
+    if "child" in q:
         filters["age_group"] = "child"
-    elif "teenager" in words:
+    elif "teen" in q:
         filters["age_group"] = "teenager"
-    elif "adult" in words:
+    elif "adult" in q:
         filters["age_group"] = "adult"
-    elif "senior" in words:
+    elif "senior" in q:
         filters["age_group"] = "senior"
 
-    # YOUNG SPECIAL RULE
-    if "young" in words:
+
+    if "young" in q:
         filters["min_age"] = 16
         filters["max_age"] = 24
 
-    # ABOVE
-    if "above" in words:
-        try:
-            idx = words.index("above")
-            filters["min_age"] = int(words[idx + 1])
-        except:
-            return None
+    match = re.search(r"above\s+(\d+)", q)
+    if match:
+        filters["min_age"] = int(match.group(1))
 
-    # COUNTRY MAP
-    countries = {
-        "nigeria": "NG",
-        "kenya": "KE",
-        "angola": "AO"
-    }
+    # below X → max_age
+    match = re.search(r"below\s+(\d+)", q)
+    if match:
+        filters["max_age"] = int(match.group(1))
 
-    for word in words:
-        if word in countries:
-            filters["country_id"] = countries[word]
+    # between X and Y → both
+    match = re.search(r"between\s+(\d+)\s+and\s+(\d+)", q)
+    if match:
+        filters["min_age"] = int(match.group(1))
+        filters["max_age"] = int(match.group(2))
+
+    for country_name, code in COUNTRY_MAP.items():
+        if country_name in q:
+            filters["country_id"] = code
+            break
 
     return filters if filters else None

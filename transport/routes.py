@@ -192,6 +192,12 @@ def list_profiles(
     if min_country_probability is not None:
         query = query.filter(Profile.country_probability >= min_country_probability)
 
+    base_query = query
+
+
+    total = base_query.with_entities(func.count()).order_by(None).scalar()
+
+
     sort_fields = {
         "age": Profile.age,
         "created_at": Profile.created_at,
@@ -199,16 +205,19 @@ def list_profiles(
     }
 
     if sort_by not in sort_fields or order not in ["asc", "desc"]:
-        raise HTTPException(status_code=400, detail="Invalid query parameters")
-
-    total = query.count()
+        return {"status": "error", "message": "Invalid query parameters"}
 
     sort_column = sort_fields[sort_by]
-    query = query.order_by(
-        sort_column.desc() if order == "desc" else sort_column.asc()
-    )
 
-    data = query.offset((page - 1) * limit).limit(limit).all()
+    if order == "desc":
+        base_query = base_query.order_by(sort_column.desc())
+    else:
+        base_query = base_query.order_by(sort_column.asc())
+
+
+    offset = (page - 1) * limit
+
+    data = base_query.offset(offset).limit(limit).all()
 
     return {
         "status": "success",
