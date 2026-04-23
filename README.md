@@ -11,10 +11,14 @@ Here is the link to the live: https://profile-intelligence-service-production-6c
   - [Genderize.io](https://genderize.io) - Gender prediction
   - [Agify.io](https://agify.io) - Age prediction
   - [Nationalize.io](https://nationalize.io) - Nationality prediction
-- **Intelligent Filtering**: Query profiles by gender, country, or age group
+- **Advanced Query Filtering**: Filter profiles by gender, age group, country, and probability thresholds
+- **Natural Language Search**: Parse user-friendly queries (e.g., "young females from Nigeria")
+- **Sorting & Pagination**: Sort by age, creation date, or gender probability with configurable pagination
+- **Profile Management**: Create, retrieve, list, and delete profiles
 - **CORS Support**: Cross-origin requests enabled for frontend integration
 - **Error Handling**: Comprehensive error responses with meaningful messages
 - **Async Operations**: Non-blocking API calls for improved performance
+- **Database Indexing**: Optimized queries on gender, country, and age fields
 
 ## Project Structure
 
@@ -182,29 +186,39 @@ Status Codes:
 
 ---
 
-### LIST Profiles (with Filters)
+### LIST Profiles (with Filters, Sorting & Pagination)
 **Endpoint**: `GET /api/profiles`
 
-Retrieve all profiles with optional filtering.
+Retrieve all profiles with optional filtering, sorting, and pagination.
 
 **Query Parameters**:
 - `gender` (optional): Filter by gender ("male", "female")
 - `country_id` (optional): Filter by country code ("US", "GB", etc.)
 - `age_group` (optional): Filter by age group ("child", "teenager", "adult", "senior")
+- `min_age` (optional): Filter profiles with age >= value
+- `max_age` (optional): Filter profiles with age <= value
+- `min_gender_probability` (optional): Filter by minimum gender confidence (0.0-1.0)
+- `min_country_probability` (optional): Filter by minimum country confidence (0.0-1.0)
+- `sort_by` (optional): Sort field ("age", "created_at", "gender_probability"). Default: "created_at"
+- `order` (optional): Sort order ("asc", "desc"). Default: "asc"
+- `page` (optional): Page number for pagination. Default: 1
+- `limit` (optional): Number of results per page (max 50). Default: 10
 
 **Examples**:
 ```
-GET /api/profiles?gender=male
-GET /api/profiles?country_id=US
-GET /api/profiles?age_group=adult
-GET /api/profiles?gender=male&country_id=US&age_group=adult
+GET /api/profiles?gender=male&page=1&limit=10
+GET /api/profiles?country_id=US&sort_by=age&order=desc
+GET /api/profiles?age_group=adult&min_gender_probability=0.9
+GET /api/profiles?gender=female&min_age=20&max_age=35&sort_by=created_at
 ```
 
 **Response**:
 ```json
 {
   "status": "success",
-  "count": 2,
+  "page": 1,
+  "limit": 10,
+  "total": 42,
   "data": [
     {
       "id": "01a23b45c6d789e0f1g2h3i4j5k6l7m8",
@@ -228,6 +242,57 @@ GET /api/profiles?gender=male&country_id=US&age_group=adult
 
 Status Codes:
 - `200`: Success (may return empty array)
+
+---
+
+### SEARCH Profiles (Natural Language Query)
+**Endpoint**: `GET /api/profiles/search`
+
+Search profiles using natural language queries. The parser automatically extracts filters from your query.
+
+**Query Parameters**:
+- `q` (required): Natural language search query
+- `page` (optional): Page number for pagination. Default: 1
+- `limit` (optional): Number of results per page. Default: 10
+
+**Supported Query Keywords**:
+- **Gender**: "male", "female"
+- **Age Groups**: "child", "teenager", "adult", "senior"
+- **Age Ranges**: "young" (16-24), "above {age}", "below {age}"
+- **Countries**: "nigeria", "kenya", "angola"
+
+**Examples**:
+```
+GET /api/profiles/search?q=young%20females
+GET /api/profiles/search?q=male%20above%2030
+GET /api/profiles/search?q=adult%20from%20nigeria
+GET /api/profiles/search?q=female%20teenager&page=1&limit=20
+```
+
+**Response**:
+```json
+{
+  "status": "success",
+  "page": 1,
+  "limit": 10,
+  "total": 15,
+  "data": [
+    {
+      "id": "01a23b45c6d789e0f1g2h3i4j5k6l7m8",
+      "name": "alice",
+      "gender": "female",
+      "age": 22,
+      "age_group": "adult",
+      "country_id": "US"
+    }
+  ]
+}
+```
+
+Status Codes:
+- `200`: Search successful (may return empty results)
+- `400`: Missing or empty query parameter
+- `400`: Unable to interpret query (no matching filters found)
 
 ---
 
