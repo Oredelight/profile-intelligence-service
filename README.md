@@ -114,7 +114,7 @@ Enriches a profile with demographic data based on the provided name.
 **Request**:
 ```json
 {
-  "name": "john"
+  "name": "Grace"
 }
 ```
 
@@ -125,16 +125,16 @@ Success (New Profile):
 {
   "status": "success",
   "data": {
-    "id": "01a23b45c6d789e0f1g2h3i4j5k6l7m8",
-    "name": "john",
-    "gender": "male",
+    "id": "019db997-3759-7d7b-8df4-4ac0920b5853",
+    "name": "grace",
+    "gender": "female",
     "gender_probability": 0.99,
-    "sample_size": 12500,
-    "age": 28,
-    "age_group": "adult",
-    "country_id": "US",
-    "country_probability": 0.25,
-    "created_at": "2024-04-16T10:30:45Z"
+    "age": 61,
+    "age_group": "senior",
+    "country_id": "NG",
+    "country_name": "Nigeria",
+    "country_probability": 0.0669367966930942,
+    "created_at": "2026-04-23T09:06:28.313547"
   }
 }
 ```
@@ -166,16 +166,16 @@ Retrieve a specific profile by its UUID.
 {
   "status": "success",
   "data": {
-    "id": "01a23b45c6d789e0f1g2h3i4j5k6l7m8",
-    "name": "john",
-    "gender": "male",
+    "id": "019db997-3759-7d7b-8df4-4ac0920b5853",
+    "name": "grace",
+    "gender": "female",
     "gender_probability": 0.99,
-    "sample_size": 12500,
-    "age": 28,
-    "age_group": "adult",
-    "country_id": "US",
-    "country_probability": 0.25,
-    "created_at": "2024-04-16T10:30:45Z"
+    "age": 61,
+    "age_group": "senior",
+    "country_id": "NG",
+    "country_name": "Nigeria",
+    "country_probability": 0.0669367966930942,
+    "created_at": "2026-04-23T09:06:28.313547"
   }
 }
 ```
@@ -325,7 +325,7 @@ Status Codes:
 | `age_group` | String | | Age category ("child", "teenager", "adult", "senior") |
 | `country_id` | String | | ISO 3166-1 alpha-2 country code |
 | `country_probability` | Float | | Country prediction confidence (0.0-1.0) |
-| `created_at` | String | | ISO 8601 timestamp (UTC) |
+| `created_at` | String | 
 
 ## Age Group Classification
 
