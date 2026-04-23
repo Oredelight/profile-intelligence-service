@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from database.db import get_db
 from database.model import Profile
 from database.schemas import ProfileCreate
@@ -54,7 +53,7 @@ async def create_profile(payload: ProfileCreate, db: Session = Depends(get_db)):
     profile = Profile(
         id=str(uuid7()),
         name=name,
-        gender=gender_data["gender"],
+        gender=gender_data["gender"].strip().lower(),
         gender_probability=gender_data["probability"],
         age=age_data["age"],
         age_group=get_age_group(age_data["age"]),
@@ -73,97 +72,6 @@ async def create_profile(payload: ProfileCreate, db: Session = Depends(get_db)):
         "data": serialize_profile(profile)
     }
 
-
-# GET by ID
-@router.get("/{id}")
-def get_profile(id: str, db: Session = Depends(get_db)):
-    profile = db.query(Profile).filter(Profile.id == id).first()
-
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profile not found")
-
-    return {
-        "status": "success",
-        "data": serialize_profile(profile)
-    }
-
-
-# GET list with filters
-@router.get("")
-def list_profiles(
-    gender: str = None,
-    age_group: str = None,
-    country_id: str = None,
-    min_age: int = None,
-    max_age: int = None,
-    min_gender_probability: float = None,
-    min_country_probability: float = None,
-    sort_by: str = "created_at",
-    order: str = "asc",
-    page: int = 1,
-    limit: int = 10,
-    db: Session = Depends(get_db)
-):
-    if page < 1 or limit < 1:
-        raise HTTPException(400, "Invalid query parameters")
-
-    if limit > 50:
-        limit = 50
-
-    query = db.query(Profile)
-
-    # Filters
-    if gender:
-        query = query.filter(func.lower(Profile.gender) == gender.lower())
-
-    if age_group:
-        query = query.filter(func.lower(Profile.age_group) == age_group.lower())
-
-    if country_id:
-        query = query.filter(func.lower(Profile.country_id) == country_id.lower())
-
-    if min_age is not None:
-        query = query.filter(Profile.age >= min_age)
-
-    if max_age is not None:
-        query = query.filter(Profile.age <= max_age)
-
-    if min_gender_probability is not None:
-        query = query.filter(Profile.gender_probability >= min_gender_probability)
-
-    if min_country_probability is not None:
-        query = query.filter(Profile.country_probability >= min_country_probability)
-
-    # Sorting
-    sort_fields = {
-        "age": Profile.age,
-        "created_at": Profile.created_at,
-        "gender_probability": Profile.gender_probability
-    }
-
-    if sort_by not in sort_fields:
-        raise HTTPException(400, "Invalid query parameters")
-
-    sort_column = sort_fields[sort_by]
-
-    if order == "desc":
-        query = query.order_by(sort_column.desc())
-    else:
-        query = query.order_by(sort_column.asc())
-
-    # Pagination
-    total = query.count()
-
-    results = query.offset((page - 1) * limit).limit(limit).all()
-
-    return {
-        "status": "success",
-        "page": page,
-        "limit": limit,
-        "total": total,
-        "data": [serialize_profile_list(p) for p in results]
-    }
-
 @router.get("/search")
 def search_profiles(
     q: str,
@@ -171,13 +79,14 @@ def search_profiles(
     limit: int = 10,
     db: Session = Depends(get_db)
 ):
-    if not q.strip():
-        raise HTTPException(400, "Missing query")
+
+    if not q or not q.strip():
+        return {"status": "error", "message": "Invalid query parameters"}
 
     filters = parse_query(q)
 
     if not filters:
-        raise HTTPException(400, "Unable to interpret query")
+        return {"status": "error", "message": "Unable to interpret query"}
 
     query = db.query(Profile)
 
@@ -208,13 +117,99 @@ def search_profiles(
         "data": [serialize_profile_list(p) for p in results]
     }
 
-# DELETE
-@router.delete("/{id}")
-def delete_profile(id: str, db: Session = Depends(get_db)):
+
+# GET by ID
+@router.get("/{id}")
+def get_profile(id: str, db: Session = Depends(get_db)):
     profile = db.query(Profile).filter(Profile.id == id).first()
 
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
+
+    return {
+        "status": "success",
+        "data": serialize_profile(profile)
+    }
+
+# GET list with filters
+@router.get("")
+def list_profiles(
+    gender: str = None,
+    age_group: str = None,
+    country_id: str = None,
+    min_age: int = None,
+    max_age: int = None,
+    min_gender_probability: float = None,
+    min_country_probability: float = None,
+    sort_by: str = "created_at",
+    order: str = "asc",
+    page: int = 1,
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    if page < 1 or limit < 1:
+        return {"status": "error", "message": "Invalid query parameters"}
+
+    limit = min(limit, 50)
+
+    query = db.query(Profile)
+
+    # FILTERS
+    if gender:
+        query = query.filter(Profile.gender == gender.lower().strip())
+
+    if age_group:
+        query = query.filter(Profile.age_group == age_group.lower().strip())
+
+    if country_id:
+        query = query.filter(Profile.country_id == country_id.upper().strip())
+
+    if min_age is not None:
+        query = query.filter(Profile.age >= min_age)
+
+    if max_age is not None:
+        query = query.filter(Profile.age <= max_age)
+
+    if min_gender_probability is not None:
+        query = query.filter(Profile.gender_probability >= min_gender_probability)
+
+    if min_country_probability is not None:
+        query = query.filter(Profile.country_probability >= min_country_probability)
+
+    # COUNT (AFTER FILTERS)
+    total = query.count()
+
+    # SORT
+    sort_map = {
+        "age": Profile.age,
+        "created_at": Profile.created_at,
+        "gender_probability": Profile.gender_probability
+    }
+
+    column = sort_map.get(sort_by, Profile.created_at)
+
+    query = query.order_by(column.desc() if order == "desc" else column.asc())
+
+    # PAGINATION
+    data = query.offset((page - 1) * limit).limit(limit).all()
+
+    return {
+        "status": "success",
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "data": [serialize_profile_list(p) for p in data]
+    }
+
+
+# DELETE
+@router.delete("/{id}")
+def delete_profile(id: str, db: Session = Depends(get_db)):
+
+    profile = db.query(Profile).filter(Profile.id == id).first()
+
+    if not profile:
+        return {"status": "error", "message": "Profile not found"}
 
     db.delete(profile)
     db.commit()
