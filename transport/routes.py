@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from database.db import get_db
 from database.model import Profile
 from database.schemas import ProfileCreate
