@@ -18,7 +18,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Custom error format (CRITICAL)
+# Custom error format
 @app.exception_handler(HTTPException)
 async def custom_http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
@@ -34,7 +34,6 @@ app.include_router(routes.router)
 
 # Seed command
 def seed_database():
-    """Seed the database with profiles from seed_profiles.json"""
     from utils.seeder import load_seed_profiles
     result = load_seed_profiles()
     print(f"\nSeeding Result:")

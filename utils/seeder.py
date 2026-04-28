@@ -7,13 +7,6 @@ from database.model import Profile
 
 
 def load_seed_profiles():
-    """
-    Load seed profiles from seed_profiles.json in the root directory.
-    Handles deduplication and idempotent seeding.
-    
-    Returns: dict with created_count, skipped_count, error_count
-    """
-    # Get the root directory path
     root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     seed_file = os.path.join(root_dir, "seed_profiles.json")
 
@@ -41,7 +34,6 @@ def load_seed_profiles():
     try:
         for profile_data in profiles:
             try:
-                # Validate required fields
                 required_fields = [
                     "name", "gender", "gender_probability", "age", "age_group",
                     "country_id", "country_name", "country_probability"
@@ -53,16 +45,13 @@ def load_seed_profiles():
                         error_count += 1
                         continue
 
-                # Normalize name (lowercase for comparison)
                 name = profile_data["name"].strip().lower()
 
-                # Check if profile already exists
                 existing = db.query(Profile).filter(Profile.name == name).first()
                 if existing:
                     skipped_count += 1
                     continue
 
-                # Create new profile
                 profile = Profile(
                     id=str(uuid7()),
                     name=name,
@@ -84,7 +73,6 @@ def load_seed_profiles():
                 error_count += 1
                 continue
 
-        # Commit all at once for better performance
         db.commit()
         print(f"Seeding completed - Created: {created_count}, Skipped: {skipped_count}, Errors: {error_count}")
 

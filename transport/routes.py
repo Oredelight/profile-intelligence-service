@@ -92,11 +92,9 @@ def search_profiles(
     limit: int = 10,
     db: Session = Depends(get_db)
 ):
-    # Validate query parameter
     if not q or not q.strip():
         raise HTTPException(status_code=400, detail="Invalid query parameters")
 
-    # Validate pagination
     if page < 1:
         raise HTTPException(status_code=400, detail="Invalid query parameters")
     if limit < 1:
@@ -104,13 +102,11 @@ def search_profiles(
     if limit > 50:
         limit = 50
 
-    # Parse query
     filters = parse_query(q)
 
     if not filters:
         raise HTTPException(status_code=400, detail="Unable to interpret query")
 
-    # Build query
     query = db.query(Profile)
 
     if "gender" in filters:
@@ -207,7 +203,6 @@ def list_profiles(
     if order not in ["asc", "desc"]:
         raise HTTPException(status_code=422, detail="Invalid query parameters")
 
-    # Build query with filters
     query = db.query(Profile)
 
     if gender:
